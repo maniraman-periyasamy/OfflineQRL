@@ -1,0 +1,99 @@
+# *** Config file for offline BCQ training in CartPole with a classical imitator (MLP) and a quantum agent (VQC).
+# Gym envrionment/wrapper config.
+environment:
+  name: "HardwareCartPole"
+  n_past_obs: 1		                # Number of past observations included in current observation.
+  actions: [-1, -0.7, 0, 0.7, 1]  # Actions to use for discretization. Top 5 most common actions in offline dataset.
+  max_episode_steps: 5000	        # Should be also set in training:max_return.
+  action_type: "discrete"	        # Discretize actions.
+  include_action: true		        # Include actions in observation.
+  include_deltas: true		        # Include position and theta delta
+  mult_pos_theta: false	          # Multiply position and theta.
+  mult_deltas: false		          # Multiply deltas.
+  scaling: true		                # Map values to interval [-pi, pi].
+  random_offset: true		          # Flag wether poles starts at origin or random offset at each offset.
+  
+# Function approximator.
+models:	
+  # BCQ requires two models.	
+  # Q-network
+  qNet:
+    name: "HwSkolikVQC"
+    input_dim: 5   			                    # Number of inputs to VQC.
+    output_dim: 5			                      # Number of outputs from VQC.
+    n_past_obs: 1		                        # Should be set the same way as in environment (Number of past observations included in current observation).
+    data_reuploading_layers: 3	            # Number of data re-uploading layers.
+    data_reuploading_type: "normal"         # Type of data re-uploading ("normal", "cyclic") -> inlcudes a re-uploading layer before each variational layer.
+    grad_type: "SPSA"                       # Gradient estimation method ("SPSA, "Parameter-shift")
+    epsilon: 0.1   	                        # SPSA epsilon (perturbation scaling)
+    quantum_compute_method:	"analytical"    # Type of executor ("analytical", "shot-based", "ibmq")
+    quantum_weight_initialization: "random" # Type of weight initialization ("random, "ones", "zeros")
+    add_input_weights: False                # Add a fully connected layer to the input.
+    add_output_weights: False	              # Add a fully connected layer to the output.
+    input_scaling: False                    # Add a scaling parameter to the inputs.
+    output_scaling: True	                  # Add a scaling parameter to the outputs.
+    input_weight_initialization: "random"   # Type of input weight initialization. ("random, "ones")
+    output_weight_initialization: "ones"    # Type of output weight initialization. ("random, "ones")
+    post_process_decode: "None"             # Ignored for now.
+    num_parallel_process: 12                # Number of parallel process generated
+    shots: 512                              # Number of shots to be used for shot-based simulator.
+    ibmq_session_max_time: 7*60*60          # Maximum time for ibmq session in seconds.
+    batch_size: 32	                        # Set to same value as in training: because torch_layer needs it.
+    fix_parameter_indices: null	            # List of indices that should remain fixed throught training i.e., no gradient updates.
+    
+   # Imitator network
+  imitator:
+    name: "MLP"
+    input_dim:  10
+    output_dim: 5
+    num_layers: 2
+    hidden_dim: [128, 128]
+    
+# Optimizer
+optimizer:
+  name: "Adam"			  # Name of PyTorch optimizer.
+  general:			      # These parameters are the same for all parameters (lr is the default lr for parameters that are not explicitly listed in learning_rates).
+    amsgrad: false     # AMSgrad
+    lr: 0.0003        # Previously and 0,0005 for scaling parameter.
+  learning_rates: 		# Set learning rates for individual parameters.
+    qNet:
+      #none: null		  # Set to this if you not wish to use seperate learning rates.
+      model.trainable_parameters: 0.008                      # Learning rate for variational parameters.
+      model.output_scaling_layer.trainable_parameters: 0.008 # Learning rate for output scaling.
+    imitator:
+      #none: null		  # MLP should just use the general learning rate.
+      # First layer weights.
+      model.0.weight: 0.1
+      model.0.bias: 0.1
+      # Second layer weights.
+      model.2.weight: 0.1
+      model.2.bias: 0.1
+      # Output layer weights.
+      model.4.weight: 0.1
+      model.4.bias: 0.1
+
+# Policy config, different policies might have different parameters.
+policy:
+  name: "discreteBCQ"		        # Name of policy.
+  BCQ_threshold: 0.3		        # Threshold for selection of action from imitator (0 -> DQN, 1 -> imitation learning).
+  discount: 0.99		            # Discount factor in expected return calculation i.e. gamma.
+  polyak_target_update: true	  # Use polyak update (i.e. convex combination of prev. target parameters and current Q-net parameters, so-called soft update) to update target network or use simple copy update.
+  tau: 0.005			              # Combination parameter for polyak update.
+  target_update_frequency: 100  # Number of updated steps after which target network is updated.
+  initial_eps: 0   		          # Starting value of epsilon for epsilon decay.
+  end_eps: 0   			            # End vale to which epsilon decay converges to.
+  eps_decay_period: 1   	      # How many training steps till end_eps should be reached.
+  eval_eps: 0			              # Epsilon value during policy evaluation.
+
+# Parameters for the training process.
+training:
+  batch_size: 32		            # Batch size used for training step.
+  eval_freq: 10.0	            # Number of training steps between policy evaluation. 
+  buffer_size: 10000		        # Size of buffer for experience replay.
+  buffer_pth: null		          # Path to buffer for training. If null give path via command line argument -b.
+  max_training_steps: 25000	    # Number of update steps during training i.e. duration of training.
+  eval_episodes: 1		          # Number of environment episodes to run during policy evaluation. (If >0 expects that a gym environment is passed to perform online validation.)
+  create_checkpoints: true	    # Save model parameters after each policy evaluation.
+  early_stopping_flag: true	    # Stop training once the average return during evaluation reachtes <max_return>.
+  max_return: 5000		          # Maximum return to use as early stopping criteria. To not use it set to null.
+ 

@@ -1,0 +1,44 @@
+# *** Config file for online DQN training in CartPole with classical MLP.
+# Gym envrionment/wrapper config.
+environment:
+  name: "CartPole"  
+  
+# Function approximator.
+models:
+  name: "MLP"
+  input_dim:  4
+  output_dim: 2
+  num_layers: 2
+  hidden_dim: [128, 128]
+
+# Optimizer and parameters.
+optimizer: Adam
+optimizer_parameters: 
+  #amsgrad: true
+  lr: 0.001
+
+# Policy config, different policies might have different parameters.
+policy:
+  name: "DQN"			# Name of policy.
+  discount: 0.99		# Discount factor in expected return calculation i.e. gamma.
+  polyak_target_update: true	# Use polyak update (i.e. convex combination of prev. target parameters and current Q-net parameters, so-called soft update) to update target network or use simple copy update.
+  tau: 0.005			# Combination parameter for polyak update.
+  target_update_frequency: 10  # Number of updated steps after which target network is updated.
+  initial_eps: 1		# Starting value of epsilon for epsilon decay.
+  end_eps: 0.1			# End vale to which epsilon decay converges to.
+  eps_decay_period: 100	# How many training steps till end_eps should be reached.
+  eval_eps: 0			# Epsilon value during policy evaluation.
+
+# Parameters for the training process.
+training:
+  batch_size: 32		# Batch size used for training step.
+  eval_freq: 50.0		# Number of training steps between policy evaluation. 
+  replay_buffer_size: 20000	# Size of buffer for experience replay.
+  step_per_collect: 10		# Number of environment steps per training step i.e. gradient steps.
+  max_training_steps: 25000	# Number of update steps during training i.e. duration of training.
+  eval_episodes: 10		# Number of environment episodes to run during policy evaluation.
+  create_checkpoints: true	# Save model parameters after each policy evaluation.
+  early_stopping_flag: true	# Stop training once the average return during evaluation reachtes <max_return>.
+  max_return: 500		# Maximum return to use as early stopping criteria. To not use it set to null.
+  num_random_steps: 5000	# Number of random steps to pre-fill replay buffer before training.
+ 

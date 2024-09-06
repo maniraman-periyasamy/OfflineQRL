@@ -1,0 +1,66 @@
+# *** Config file for offline BCQ training in CartPole with classical MLP.
+# Gym envrionment/wrapper config.
+environment:
+  name: "CartPole"  
+  state_dim: 4		# Size of state space (used if no test environment is given i.e. eval_episodes = 0).
+  num_actions: 2	# Number of actions (used if no test environment is given i.e. eval_episodes = 0).
+  
+# Function approximator.
+models:	
+  # BCQ requires two models.	
+  # Q-network
+  qNet:
+    name: "MLP"
+    input_dim:  4
+    output_dim: 2
+    num_layers: 2
+    hidden_dim: [128, 128]
+   # Imitator network
+  imitator:
+    name: "MLP"
+    input_dim:  4
+    output_dim: 2
+    num_layers: 2
+    hidden_dim: [128, 128]
+
+# Optimizer and parameters.
+#optimizer: Adam
+#optimizer_parameters: 
+  #amsgrad: true
+ # lr: 0.0003
+optimizer:
+  name: "Adam"			# Name of PyTorch optimizer.
+  general:			# These parameters are the same for all parameters (lr is the default lr for parameters that are not explicitly listed in learning_rates).
+    amsgrad: true
+    lr: 0.0003
+  learning_rates:		# Set learning rates for individual parameters.
+    model.0.weight: 0.0001
+    imitator.0.weight: 0.0001
+  
+
+# Policy config, different policies might have different parameters.
+policy:
+  name: "discreteBCQ"		# Name of policy.
+  BCQ_threshold: 0.3		# Threshold for selection of action from imitator (0 -> DQN, 1 -> imitation learning).
+  discount: 0.99		# Discount factor in expected return calculation i.e. gamma.
+  polyak_target_update: true	# Use polyak update (i.e. convex combination of prev. target parameters and current Q-net parameters, so-called soft update) to update target network or use simple copy update.
+  tau: 0.005			# Combination parameter for polyak update.
+  target_update_frequency: 100 # Number of updated steps after which target network is updated.
+  initial_eps: 0.1		# Starting value of epsilon for epsilon decay.
+  end_eps: 0.1			# End vale to which epsilon decay converges to.
+  eps_decay_period: 1   	# How many training steps till end_eps should be reached.
+  eval_eps: 0			# Epsilon value during policy evaluation.
+
+# Parameters for the training process.
+training:
+  batch_size: 32		# Batch size used for training step.
+  eval_freq: 50.0		# Number of training steps between policy evaluation. 
+  buffer_size: 100		# Size of buffer for experience replay.
+  buffer_pth: null		# Path to buffer for training. If null give path via command line argument -b.
+  step_per_collect: 10		# Number of environment steps per training step i.e. gradient steps.
+  max_training_steps: 25000	# Number of update steps during training i.e. duration of training.
+  eval_episodes: 10		# Number of environment episodes to run during policy evaluation. (If >0 expects that a gym environment is passed to perform online validation.)
+  create_checkpoints: true	# Save model parameters after each policy evaluation.
+  early_stopping_flag: true	# Stop training once the average return during evaluation reachtes <max_return>.
+  max_return: 500		# Maximum return to use as early stopping criteria. To not use it set to null.
+ 
